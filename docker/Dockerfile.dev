@@ -1,0 +1,53 @@
+# Description: Dockerfile for the development environment of the STM32 microcontroller.
+
+# Use the official Ubuntu 22.04 image as the base image
+FROM ubuntu:22.04
+
+# Set the maintainer information
+LABEL maintainer="Your Name <your.name@email.com>"
+
+# Set environment variables to avoid interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Changes the default shell for the Docker build process to bash
+SHELL ["/bin/bash", "-c"]
+
+# Set the timezone to America/Fortaleza and update the symbolic link for the timezone
+ENV TZ=America/Fortaleza
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+# Update and install base required packages
+RUN apt-get update && apt-get install -y \
+      build-essential git wget unzip python3 python3-pip \
+      && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install the dependencies for STM32CubeCLT
+RUN apt-get update && apt-get install -y \
+      udev libusb-1.0-0-dev libncurses5 libncurses5-dev libpython2.7 libpython2.7-minimal ninja-build expect \
+      && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy the STM32CubeCLT script installer
+COPY st-stm32cubeclt_1.15.1_21094_20240412_1041_amd64.deb_bundle.sh /install_stm32cubeclt.sh
+
+# Copy the STM32CubeCLT expect script
+COPY install_stm32cubeclt.exp /install_stm32cubeclt.exp
+
+# Install the STM32CubeCLT
+RUN chmod +x /install_stm32cubeclt.sh /install_stm32cubeclt.exp && \
+    /install_stm32cubeclt.exp
+
+# Create a non-root user and set permissions
+ENV USER_NAME=mcu
+ENV PROJECT_DIR=/project
+
+ARG host_uid=1000
+ARG host_gid=1000
+RUN groupadd -g $host_gid $USER_NAME && \
+    useradd -g $host_gid -m -s /bin/bash -u $host_uid $USER_NAME && \
+    mkdir -p $PROJECT_DIR && chown -R $USER_NAME:$USER_NAME $PROJECT_DIR
+
+# Switch to the non-root user
+USER $USER_NAME
+
+# Set the working directory
+WORKDIR $PROJECT_DIR
